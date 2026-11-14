@@ -1,0 +1,117 @@
+name: Pytest ranking demonstration
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      strategy:
+        description: Prioritization strategy
+        type: choice
+        required: true
+        default: hybrid
+        options: [qtf, recentfail, simchgpath, hybrid]
+      inject_bug:
+        description: Intentionally trigger a regression failure
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ranking-demo-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  compare:
+    runs-on: ubuntu-latest
+    env:
+      DEMO_BUG: ${{ inputs.inject_bug && '1' || '0' }}
+      STRATEGY: ${{ inputs.strategy || 'hybrid' }}
+      PYTHONUNBUFFERED: '1'
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install test dependencies
+        run: python -m pip install -r requirements.txt
+
+      # GitHub-hosted runners are ephemeral: the plugin history must survive builds.
+      - name: Restore pytest-ranking history
+        uses: actions/cache/restore@v4
+        with:
+          path: .pytest_cache/v/pytest_ranking_data
+          key: ranking-${{ runner.os }}-py311-${{ github.ref_name }}-${{ github.run_id }}
+          restore-keys: |
+            ranking-${{ runner.os }}-py311-${{ github.ref_name }}-
+
+      - name: Initialize ranking cache when absent
+        shell: bash
+        run: |
+          if [ ! -d .pytest_cache/v/pytest_ranking_data ]; then
+            echo 'No stored history: perform one passing warm-up run.'
+            DEMO_BUG=0 python -m pytest --rank --rank-weight=1-0-0 -q
+          else
+            echo 'Using history restored from a previous workflow run.'
+          fi
+
+      - name: Run default Pytest order
+        shell: bash
+        run: |
+          mkdir -p reports
+          # Continue to ranked run even if an intentional regression is found.
+          set +e
+          DEMO_TRACE_FILE=reports/default.json python -m pytest -vv 2>&1 | tee reports/default.log
+          printf '%s\n' "${PIPESTATUS[0]}" > reports/default.exit
+          exit 0
+
+      - name: Simulate a changed payment source file for SimChgPath
+        if: ${{ inputs.strategy == 'simchgpath' }}
+        run: |
+          # Demonstrates checksum-based change detection against the restored cache.
+          # The comment does not change application behavior.
+          echo '# simulated CI edit for SimChgPath' >> shop/payment.py
+
+      - name: Run pytest-ranking strategy
+        shell: bash
+        run: |
+          case "$STRATEGY" in
+            qtf)        weights='1-0-0' ;;
+            recentfail) weights='0-1-0' ;;
+            simchgpath) weights='0-0-1' ;;
+            hybrid)     weights='1-1-1' ;;
+            *) echo 'Unexpected strategy' >&2; exit 2 ;;
+          esac
+          echo "Strategy: $STRATEGY, weights: $weights"
+          set +e
+          DEMO_TRACE_FILE=reports/ranked.json python -m pytest --rank "--rank-weight=$weights" --rank-level=function -vv 2>&1 | tee reports/ranked.log
+          printf '%s\n' "${PIPESTATUS[0]}" > reports/ranked.exit
+          exit 0
+
+      - name: Show first-failure comparison
+        if: always()
+        run: python scripts/compare_traces.py reports
+
+      - name: Upload trace files for classroom screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pytest-ranking-comparison
+          path: reports/
+
+      - name: Save updated ranking history for next CI run
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: .pytest_cache/v/pytest_ranking_data
+          key: ranking-${{ runner.os }}-py311-${{ github.ref_name }}-${{ github.run_id }}
+
+      - name: Set final CI status
+        if: always()
+        run: python scripts/check_results.py
