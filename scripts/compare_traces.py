@@ -14,7 +14,7 @@ def main():
             raise SystemExit(f"Missing {path}; run both test commands first.")
         records.append((name, json.loads(path.read_text(encoding="utf-8"))))
 
-    lines = ["## Observed test execution (not a simulation)", ""]
+    lines = ["## Observed test execution", ""]
     lines += ["| Run | Tests | First failure | Test session | First executed test |", "|---|---:|---:|---:|---|"]
     for name, record in records:
         first = record["tests"][0]["test"] if record["tests"] else "(none)"
