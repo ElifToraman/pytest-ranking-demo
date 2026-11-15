@@ -72,12 +72,11 @@ jobs:
           exit 0
 
       - name: Simulate a changed payment source file for SimChgPath
-        if: ${{ inputs.strategy == 'simchgpath' }}
+        if: ${{ inputs.strategy == 'simchgpath' || inputs.strategy == 'hybrid' }}
         run: |
           # Demonstrates checksum-based change detection against the restored cache.
           # The comment does not change application behavior.
           echo '# simulated CI edit for SimChgPath' >> shop/payment.py
-
       - name: Run pytest-ranking strategy
         shell: bash
         run: |
