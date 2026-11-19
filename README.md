@@ -108,15 +108,6 @@ then saves updated data under a new key containing `github.run_id`. This prevent
 immutable-cache reuse from freezing the history. It uploads test traces as a CI
 artifact and gives a quick comparison in the Actions step summary.
 
-## Important points for a class presentation
-
-- Reordering does **not** necessarily make the full suite faster; compare **time
-  to first failure**, not just total duration.
-- The first run is a cold start. QTF/RecentFail require historical measurements.
-- File-path similarity is a heuristic and can be wrong even when code changed.
-- Test order changes may expose order-dependent (flaky) tests. This project has
-  no intentionally order-dependent tests.
-- An intentionally broken run is expected to produce a **failed CI status**.
 
 ## References
 
