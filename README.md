@@ -77,38 +77,6 @@ At module granularity (`--rank-level=module`), whole test files are ranked while
 tests *within* each file retain their default relative order. With `function`,
 each test function can move on its own.
 
-## Run in GitHub Actions
-
-1. Create an **empty** GitHub repository named `pytest-ranking-demo` (do not add
-   an initial README in GitHub).
-2. From this folder:
-
-   ```bash
-   git init
-   git add .
-   git commit -m "Add Pytest regression prioritization demo"
-   git branch -M main
-   git remote add origin https://github.com/YOUR_USERNAME/pytest-ranking-demo.git
-   git push -u origin main
-   ```
-
-3. Open the GitHub repository > **Actions** > **Pytest ranking demonstration**.
-4. The automatic `push` run should pass. It initializes and saves plugin history.
-5. Select **Run workflow** with `strategy=qtf` and `inject_bug=true`.
-6. Open the resulting run, expand the two test steps, and read the **Summary**.
-   The failure is intentionally injected, so the final job status will be red.
-7. Repeat a manual run with `strategy=recentfail` and `inject_bug=true` to show
-   how previously failing tests are favored. For `simchgpath`, select that strategy
-   in a manual run: the workflow appends a harmless comment to `shop/payment.py`
-   **after restoring the previous cache**, demonstrating checksum-based detection
-   of changed Python files. You can separately demonstrate a real committed change.
-
-The workflow restores `.pytest_cache/v/pytest_ranking_data` by a cache-key prefix,
-then saves updated data under a new key containing `github.run_id`. This prevents
-immutable-cache reuse from freezing the history. It uploads test traces as a CI
-artifact and gives a quick comparison in the Actions step summary.
-
-
 ## References
 
 - [pytest-ranking source](https://github.com/softwareTestingResearch/pytest-ranking)
